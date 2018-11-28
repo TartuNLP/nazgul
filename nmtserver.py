@@ -94,7 +94,7 @@ def postprocess(sentence, segmenter, detokenizer):
     de_segmented_sentence = segmenter.DecodePieces(sentence.split())
     de_truecased_sentence = de_segmented_sentence[0].upper() + de_segmented_sentence[1:]
     de_tokenized_sentence = detokenizer(de_truecased_sentence.split())
-	 
+    
     log("POSTPROC received '" + sentence + "', turned it into '" + de_tokenized_sentence + "'")
     
     return de_tokenized_sentence
@@ -102,21 +102,24 @@ def postprocess(sentence, segmenter, detokenizer):
 def forward(sentences, t):
     trans_inputs = [inference.make_input_from_factored_string(sentence_id=i, factored_string=sentence, translator=t) for i, sentence in enumerate(sentences)]
     outputs = t.translate(trans_inputs)
-    return [output.translation for output in outputs]
+    return [(output.translation, output.score) for output in outputs]
 
 def translate(sentences, lang_factor, style_factor,
-              tokenizer, detokenizer, truecaser, segmenter,
-              translator):
+              tokenizer = my_tokenizer, detokenizer = my_detokenizer, truecaser = my_truecaser_enetlv, segmenter = my_segmenter_enetlv,
+              translator = my_translator_enetlv):
     
     #livesubs = "|" in text
     #sentences = text.split("|") if livesubs else sent_tokenize(text)
     cleaninputs = doMany(sentences, preprocess, (lang_factor, style_factor, tokenizer, truecaser, segmenter))
-    translations = forward(cleaninputs, translator)
+    
+    scoredTranslations = forward(cleaninputs, translator)
+    translations, scores = zip(*scoredTranslations)
+    
     postprocessed_translations = doMany(translations, postprocess, (segmenter, detokenizer))
     #findelim = "|" if livesubs else " "
     #postprocessed_translation = findelim.join(postprocessed_translations)
     
-    return postprocessed_translations
+    return postprocessed_translations, scores
 
 def parseInput(rawText):
 	global supportedStyles, defaultStyle, supportedOutLangs, defaultOutLang
@@ -176,15 +179,15 @@ def send(rawtext,
     inputSntList, outputLang, outputStyle, delim = parseInput(rawtext)
     
     start = time()
-    preres = translate(inputSntList, outputLang, outputStyle,
+    preres, scores = translate(inputSntList, outputLang, outputStyle,
                      tokenizer, detokenizer, truecaser, segmenter,
                      translator)
     sntcount = len(inputSntList)
     res = delim.join(preres) if delim else preres
     endtime = time() - start
-    log("input: '{0}', output: '{1}', snt. count {2}, comp. time: {3}".format(rawtext, res, sntcount, endtime))
+    log("input: '{0}', output: '{1}', snt. count {2}, scores {3}, comp. time: {4}".format(rawtext, res, sntcount, "/".join(["{0:.2}".format(s) for s in scores]), endtime))
 
-    return res
+    return res, scores
 
 def startServ():
 	global sntId
@@ -205,7 +208,7 @@ def startServ():
 			gotthis = c.recv(4096).decode('utf-8')
 			info = json.loads(gotthis)
 			#log(gotthis)
-			response = send(info['src'])
+			response, scores = send(info['src'])
 			msg = json.dumps({'raw_trans': ['-'],
 				'raw_input': ['-'],
 				'final_trans': response})
@@ -220,9 +223,9 @@ def startServ():
 			c.close()
 
 def prtr(lines, outputLang, outputDomain):
-	trs = send({ 'sentences': lines, 'outLang': outputLang, 'outStyle': outputDomain })
-	for tr in trs:
-		print(tr)
+	trs, scs = send({ 'sentences': lines, 'outLang': outputLang, 'outStyle': outputDomain })
+	for tr, sc in zip(trs, scs):
+		print(str(sc) + "\t" + tr)
 
 def translateStdinInBatches():
 	outputLang = sys.argv[1]
