@@ -3,11 +3,11 @@ Neural machine translation as a server, using SockEye
 
 ## Requirements:
 
-```
-pip3 install mxnet sockeye mosestokenizer estnltk
-```
-
 + https://github.com/TartuNLP/truecaser
+
+```
+pip3 install mxnet sentencepiece sockeye mosestokenizer estnltk
+```
 
 ## Usage in command-line:
 
