@@ -10,8 +10,6 @@ import socket
 import mxnet as mx
 import sentencepiece as spm
 
-import ipywidgets as widgets
-
 from truecaser import applytc
 from time import time
 from datetime import datetime
