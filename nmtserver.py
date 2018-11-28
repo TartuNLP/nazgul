@@ -224,8 +224,10 @@ def startServ():
 
 def prtr(lines, outputLang, outputDomain):
 	trs, scs = send({ 'sentences': lines, 'outLang': outputLang, 'outStyle': outputDomain })
-	for tr, sc in zip(trs, scs):
-		print(str(sc) + "\t" + tr)
+	#for tr, sc in zip(trs, scs):
+	#	print(str(sc) + "\t" + tr)
+	for tr in trs:
+		print(tr)
 
 def translateStdinInBatches():
 	outputLang = sys.argv[1]
