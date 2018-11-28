@@ -4,7 +4,7 @@ Neural machine translation as a server, using SockEye
 ## Requirements:
 
 ```
-pip3 install mxnet sockeye mosestokenizer estnltk
+pip3 install mxnet sockeye mosestokenizer estnltk sentencepiece ipywidgets
 ```
 
 + https://github.com/TartuNLP/truecaser
