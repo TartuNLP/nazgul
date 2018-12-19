@@ -12,7 +12,7 @@ pip3 install mxnet sentencepiece sockeye estnltk
 + `mosestokenizer-py` fork:
 
 ```
-pip install https://github.com/inoryy/mosestokenizer-py
+pip install https://github.com/inoryy/mosestokenizer-py/archive/master.zip
 ```
 
 ## Usage in command-line:
