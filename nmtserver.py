@@ -28,7 +28,7 @@ SOCKEYE_MODEL_FOLDER_ENETLV = ['en-et-lv-model']
 TRUECASE_MODEL_ENETLV = 'preprocessing-models/joint-truecase-enetlv.tc'
 SENTENCEPIECE_MODEL_ENETLV = 'preprocessing-models/sp.model'
 
-my_tokenizer = mosestokenizer.MosesTokenizer('en')
+my_tokenizer = mosestokenizer.MosesTokenizer('en', aggressive_hyphen_splitting=False)
 my_detokenizer = mosestokenizer.MosesDetokenizer('en')
 my_truecaser_enetlv = applytc.loadModel(TRUECASE_MODEL_ENETLV)
 my_segmenter_enetlv = spm.SentencePieceProcessor()
