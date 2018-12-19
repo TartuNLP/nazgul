@@ -6,7 +6,13 @@ Neural machine translation as a server, using SockEye
 + https://github.com/TartuNLP/truecaser
 
 ```
-pip3 install mxnet sentencepiece sockeye mosestokenizer estnltk
+pip3 install mxnet sentencepiece sockeye estnltk
+```
+
++ `mosestokenizer-py` fork:
+
+```
+pip install https://github.com/inoryy/mosestokenizer-py/archive/master.zip
 ```
 
 ## Usage in command-line:
