@@ -80,6 +80,7 @@ def preprocess(sentence, lang_factor, style_factor,
                                              tokenized_sentence).replace("@-@", "-")
     segmented_sentence = ' '.join([x
                                    for x in segmenter.EncodeAsPieces(truecased_sentence)])
+    #HERE
     factored_sentence = ' '.join([x + '|' + lang_factor + '|' + style_factor
                                   for x in segmented_sentence.split()])
     log("PREPROC received '" + sentence + "', turned it into '" + segmented_sentence + "'")
@@ -106,31 +107,42 @@ def translate(sentences, lang_factor, style_factor,
               tokenizer = my_tokenizer, detokenizer = my_detokenizer, truecaser = my_truecaser_enetlv, segmenter = my_segmenter_enetlv,
               translator = my_translator_enetlv):
     
-    #livesubs = "|" in text
-    #sentences = text.split("|") if livesubs else sent_tokenize(text)
     cleaninputs = doMany(sentences, preprocess, (lang_factor, style_factor, tokenizer, truecaser, segmenter))
     
     scoredTranslations = forward(cleaninputs, translator)
     translations, scores = zip(*scoredTranslations)
     
     postprocessed_translations = doMany(translations, postprocess, (segmenter, detokenizer))
-    #findelim = "|" if livesubs else " "
-    #postprocessed_translation = findelim.join(postprocessed_translations)
     
     return postprocessed_translations, scores
 
+def getConf(rawConf):
+	style = 'fml'
+	outlang = 'en'
+	
+	for field in rawConf.split(','):
+		if field in supportedStyles:
+			style = field
+		if field in supportedOutLangs:
+			outlang = field
+	
+	return style, outlang
+
 def parseInput(rawText):
 	global supportedStyles, defaultStyle, supportedOutLangs, defaultOutLang
+	print("LGG: " + str(rawText))
 	
 	try:
-		rawStyle, rawOutLang, fullText = rawText.split(",", maxsplit=2)
+		#rawStyle, rawOutLang, fullText = rawText['src'].split(",", maxsplit=2)
+		fullText = rawText['src']
+		rawStyle, rawOutLang = getConf(rawText['conf'])
 		
 		livesubs = "|" in fullText
 		
 		sentences = fullText.split("|") if livesubs else sent_tokenize(fullText)
 		delim = "|" if livesubs else " "
 		
-	except AttributeError:
+	except KeyError:
 		sentences = rawText['sentences']
 		rawStyle = rawText['outStyle']
 		rawOutLang = rawText['outLang']
@@ -160,7 +172,15 @@ def parseInput(rawText):
 	#if not sntl.strip()[-1] in ".?!":
 	#	sntl = sntl.strip() + "."
 
-def send(rawtext,
+def splitInBatches(lst, batchSize):
+	startIdx = 0
+	
+	while startIdx < len(lst):
+		endIdx = startIdx + batchSize
+		yield lst[startIdx:endIdx]
+		startIdx = endIdx
+
+def send(rawtext, minibatchSize = 32,
          tokenizer = my_tokenizer, detokenizer = my_detokenizer, truecaser = my_truecaser_enetlv, segmenter = my_segmenter_enetlv,
          translator = my_translator_enetlv):
     #lang_dict = {'EN': 'to-en',
@@ -177,13 +197,19 @@ def send(rawtext,
     inputSntList, outputLang, outputStyle, delim = parseInput(rawtext)
     
     start = time()
-    preres, scores = translate(inputSntList, outputLang, outputStyle,
-                     tokenizer, detokenizer, truecaser, segmenter,
-                     translator)
-    sntcount = len(inputSntList)
-    res = delim.join(preres) if delim else preres
+    preres = []
+    scores = []
+    for minibatch in splitInBatches(inputSntList, minibatchSize):
+        tmpPreres, tmpScores = translate(minibatch, outputLang, outputStyle,
+                         tokenizer, detokenizer, truecaser, segmenter,
+                         translator)
+        preres += tmpPreres
+        scores += tmpScores
+    
     endtime = time() - start
-    log("input: '{0}', output: '{1}', snt. count {2}, scores {3}, comp. time: {4}".format(rawtext, res, sntcount, "/".join(["{0:.2}".format(s) for s in scores]), endtime))
+    res = delim.join(preres) if delim else preres
+    sntcount = len(inputSntList)
+    log("input: '{0}', output: '{1}', snt. count {2}, scores {3}, comp. time: {4}".format(rawtext['src'] + "/" + rawtext['conf'], res, sntcount, "/".join(["{0:.2}".format(s) for s in scores]), endtime))
 
     return res, scores
 
@@ -206,7 +232,7 @@ def startServ():
 			gotthis = c.recv(4096).decode('utf-8')
 			info = json.loads(gotthis)
 			#log(gotthis)
-			response, scores = send(info['src'])
+			response, scores = send(info)
 			msg = json.dumps({'raw_trans': ['-'],
 				'raw_input': ['-'],
 				'final_trans': response})
@@ -235,14 +261,17 @@ def translateStdinInBatches():
 		outputDomain = 'inf'
 	lines = []
 	
-	batchMaxSize = 48
+	#batchMaxSize = 48
 	for line in sys.stdin:
 		lines.append(line.strip())
-		if len(lines) >= batchMaxSize:
-			prtr(lines, outputLang, outputDomain)
-			lines = []
-	if lines:
-		prtr(lines, outputLang, outputDomain)
+	
+	prtr(lines, outputLang, outputDomain)
+	
+	#	if len(lines) >= batchMaxSize:
+	#		prtr(lines, outputLang, outputDomain)
+	#		lines = []
+	#if lines:
+	#	prtr(lines, outputLang, outputDomain)
 
 if __name__ == "__main__":
 	#TODO implement an upper limit on server batches
