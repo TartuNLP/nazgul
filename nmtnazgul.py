@@ -15,8 +15,8 @@ from constraints import getPolitenessConstraints as getCnstrs
 from log import log
 
 # IP and port for the server
-MY_IP = '127.0.0.1'
-MY_PORT = 12345
+MY_IP = '172.17.66.215'
+MY_PORT = 12346
 
 supportedStyles = { 'fml', 'inf', 'auto' }
 styleToDomain = { 'fml': 'ep', 'inf': 'os', 'auto': 'pc' }
@@ -111,7 +111,7 @@ def encodeResponse(translationList, delim):
 
 
 def serverTranslationFunc(rawMessage, models):
-	segments, outputLang, outputStyle, delim = decodeMessage(rawMessage)
+	segments, outputLang, outputStyle, delim = decodeRequest(rawMessage)
 	
 	translations, _, _, _ = translator.translate(models, segments, outputLang, outputStyle, getCnstrs())
 	
@@ -122,7 +122,7 @@ def startTranslationServer(models, ip, port):
 	log("started server")
 	
 	# start listening as a socket server; apply serverTranslationFunc to incoming messages to genereate the response
-	sock.startServer(serverTranslationFunc, (models,), port = port, ip = ip)
+	sock.startServer(serverTranslationFunc, (models,), port = port, host = ip)
 
 
 def translateStdinInBatches(models, outputLang, outputStyle):
