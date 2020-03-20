@@ -1,5 +1,5 @@
-# SockEyeServer
-Neural machine translation as a server, using SockEye
+# Nazgul
+Multilingual multi-domain Neural machine translation server based on Amazon SockEye. One or several Nazgul instances can serve translations to [Sauron](https://github.com/TartuNLP/sauron).
 
 ## Requirements:
 
@@ -20,3 +20,4 @@ head -3 estonian-text | ./nmtserver.py lv fml > latvian-output
 ```
 ./nmtserver.py
 ```
+
