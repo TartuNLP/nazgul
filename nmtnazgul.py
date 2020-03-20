@@ -119,7 +119,7 @@ def serverTranslationFunc(rawMessage, models):
 
 
 def startTranslationServer(models, ip, port):
-	log("started server", skip=True)
+	log("started server")
 	
 	# start listening as a socket server; apply serverTranslationFunc to incoming messages to genereate the response
 	sock.startServer(serverTranslationFunc, (models,), port = port, ip = ip)
