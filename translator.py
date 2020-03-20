@@ -55,7 +55,7 @@ def _forward(sentences, models):
 	return [(output.translation, output.score) for output in outputs]
 
 
-def _loadTranslator(model_folders, ctx = mx.cpu()):
+def _loadTranslator(model_folders, ctx = mx.gpu()):
 	models, source_vocabs, target_vocab = inference.load_models(
 		context=ctx,
 		max_input_len=None,
