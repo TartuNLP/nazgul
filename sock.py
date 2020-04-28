@@ -45,7 +45,7 @@ def startServer(msgProcFunc, msgProcArgs, host = '172.17.66.215', port = 12349, 
 				c.close()
 			except Exception as e:
 				print("ERROR", e)
-				c.send(bytes(json.dumps({ 'status': 'err', 'exception': e }), 'utf-8'))
+				c.send(bytes(json.dumps({ 'status': 'err', 'exception': str(e) }), 'utf-8'))
 	finally:
 		#s.shutdown()
 		s.close()
