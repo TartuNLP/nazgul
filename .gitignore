@@ -1,6 +1,7 @@
 # User defined - truecaser and (model) dump folders
 truecaser/
 dump/
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
