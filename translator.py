@@ -12,14 +12,20 @@ from log import log
 from collections import namedtuple
 from sockeye.translate import inference
 
-def _preprocess(sentence, index, lang_factor, style_factor,
-			   models, constraints):
-	truecased_sentence = applytc.processLine(models.truecaser, sentence)
-	pieces = models.segmenter.EncodeAsPieces(truecased_sentence)
+
+def _preprocess(sentence, index, lang_factor, style_factor, models, constraints):
+	if models.truecaser:
+		truecased_sentence = applytc.processLine(models.truecaser, sentence)
+		pieces = models.segmenter.EncodeAsPieces(truecased_sentence)
+	else:
+		pieces = models.segmenter.EncodeAsPieces(sentence)
 	segmented_sentence = ' '.join(pieces)
 	
 	rawlen = len(pieces)
-	prejsson = { 'text': segmented_sentence, 'factors': [" ".join([lang_factor] * rawlen), " ".join([style_factor] * rawlen), " ".join(['f0'] * rawlen), " ".join(['g0'] * rawlen)]}
+	# TODO: Legacy code - factors (should come from config or something
+	# prejsson = {'text': segmented_sentence, 'factors': [" ".join([lang_factor] * rawlen), " ".join([style_factor] * rawlen), " ".join(['f0'] * rawlen), " ".join(['g0'] * rawlen)]}
+
+	prejsson = {'text': segmented_sentence, 'factors': [" ".join([lang_factor] * rawlen)]}
 	
 	try:
 		if constraints and constraints[index]:
@@ -82,20 +88,20 @@ def _loadTranslator(model_folders, ctx = mx.gpu()):
 								strip_unknown_words=False)
 
 
-def loadModels(translationModelPath, truecaserModelPath, segmenterModelPath):
+def load_models(sockeye_model_path, spm_model_path, tc_model_path=None):
 	"""Load translation, truecasing and segmentation models and
 	return them as a named tuple"""
 	
-	translationModel = _loadTranslator([translationModelPath,])
+	sockeye_model = _loadTranslator([sockeye_model_path, ])
+
+	segmenter_model = spm.SentencePieceProcessor()
+	segmenter_model.Load(spm_model_path)
+
+	tc_model = applytc.loadModel(tc_model_path) if tc_model_path else None
+
+	Models = namedtuple("Models", ["translator", "segmenter", "truecaser"])
 	
-	truecaserModel = applytc.loadModel(truecaserModelPath)
-	
-	segmenterModel = spm.SentencePieceProcessor()
-	segmenterModel.Load(segmenterModelPath)
-	
-	Models = namedtuple("Models", ["translator", "truecaser", "segmenter"])
-	
-	return Models(translationModel, truecaserModel, segmenterModel)
+	return Models(sockeye_model, segmenter_model, tc_model)
 
 
 def translate(models, sentences, outputLanguage, outputStyle, constraints):
