@@ -16,6 +16,7 @@ import yaml
 
 
 
+# TODO: Add this to a real config file
 ### Legacy stuff
 # supportedStyles = { 'fml', 'inf', 'auto' }
 # styleToDomain = { 'fml': 'ep', 'inf': 'os', 'auto': 'pc' }
@@ -23,20 +24,12 @@ import yaml
 # extraSupportedOutLangs = { 'est': 'et', 'lav': 'lv', 'eng': 'en', 'rus': 'ru', 'fin': 'fi', 'lit': 'lt', 'ger': 'de' }
 # defaultStyle = 'auto'
 
-supportedOutLangs = {'et', 'fi', 'vro', 'sme', 'sma'}
-defaultOutLang = 'et'
 
-
-#############################################################################################
-###################################### STDIN and Server #####################################
-#############################################################################################
-
-# TODO: Add this to a real config file
-def getConf(rawConf):
+def get_conf(raw_conf):
     style = 'auto'
     outlang = 'en'
 
-    for field in rawConf.split(','):
+    for field in raw_conf.split(','):
         if field in supportedStyles:
             style = field
         if field in supportedOutLangs:
@@ -47,12 +40,12 @@ def getConf(rawConf):
     return style, outlang
 
 
-def parseInput(rawText):
+def parse_input(raw_msg):
     global supportedStyles, defaultStyle, supportedOutLangs, defaultOutLang
 
     try:
-        fullText = rawText['src']
-        rawStyle, rawOutLang = getConf(rawText['conf'])
+        fullText = raw_msg['src']
+        raw_style, raw_out_lang = get_conf(raw_msg['conf'])
 
         livesubs = "|" in fullText
 
@@ -60,57 +53,58 @@ def parseInput(rawText):
         delim = "|" if livesubs else " "
 
     except KeyError:
-        sentences = rawText['sentences']
-        rawStyle = rawText['outStyle']
-        rawOutLang = rawText['outLang']
+        sentences = raw_msg['sentences']
+        raw_style = raw_msg['outStyle']
+        raw_out_lang = raw_msg['outLang']
         delim = False
 
-    if rawStyle not in supportedStyles:
+    if raw_style not in supportedStyles:
         # raise ValueError("style bad: " + rawStyle)
-        rawStyle = defaultStyle
+        raw_style = defaultStyle
 
-    if rawOutLang not in supportedOutLangs:
+    if raw_out_lang not in supportedOutLangs:
         # raise ValueError("out lang bad: " + rawOutLang)
-        rawOutLang = defaultOutLang
+        raw_out_lang = defaultOutLang
 
-    outputLang = rawOutLang
+    outputLang = raw_out_lang
     # outputStyle = styleToDomain[rawStyle]
     outputStyle = None
 
     return sentences, outputLang, outputStyle, delim
 
 
-def decodeRequest(rawMessage):
-    struct = json.loads(rawMessage.decode('utf-8'))
+def decode_request(raw_message):
+    struct = json.loads(raw_message.decode('utf-8'))
 
-    segments, outputLang, outputStyle, delim = parseInput(struct)
+    segments, output_lang, output_style, delim = parse_input(struct)
 
-    return segments, outputLang, outputStyle, delim
+    return segments, output_lang, output_style, delim
 
 
-def encodeResponse(translationList, delim):
-    translationText = delim.join(translationList)
+def encode_response(translation_list, delim):
+    translation_text = delim.join(translation_list)
 
+    # TODO: Check what to do with raw_trans and raw_input? Some legacy thing?
     result = json.dumps({'raw_trans': ['-'],
                          'raw_input': ['-'],
-                         'final_trans': translationText})
+                         'final_trans': translation_text})
 
     return bytes(result, 'utf-8')
 
 
-def serverTranslationFunc(rawMessage, models):
-    segments, outputLang, outputStyle, delim = decodeRequest(rawMessage)
+def server_translation_func(raw_message, sockeye_models):
+    segments, output_lang, output_style, delim = decode_request(raw_message)
 
-    translations, _, _, _ = translator.translate(models, segments, outputLang, outputStyle, getCnstrs())
+    translations, _, _, _ = translator.translate(sockeye_models, segments, output_lang, output_style, getCnstrs())
 
-    return encodeResponse(translations, delim)
+    return encode_response(translations, delim)
 
 
-def startTranslationServer(models, ip, port):
+def start_translation_server(sockeye_models, ip, port):
     log("started server")
 
-    # start listening as a socket server; apply serverTranslationFunc to incoming messages to genereate the response
-    sock.startServer(serverTranslationFunc, (models,), port=port, host=ip)
+    # start listening as a socket server; apply serverTranslationFunc to incoming messages to generate the response
+    sock.startServer(server_translation_func, (sockeye_models,), port=port, host=ip)
 
 #### TODO: Add this functionality separately
 """
@@ -169,8 +163,9 @@ if __name__ == "__main__":
 
     # read output language and style off cmdline -- both are optional and will be "None" if not given
     # olang, ostyle = readLangAndStyle()
-
+    supportedOutLangs = args.langs
+    defaultOutLang = "et"
     # load translation and preprocessing models using paths
     models = translator.load_models(args.model, args.spm_model, args.tc_model, args.cpu)
 
-    startTranslationServer(models, args.ip, args.port)
+    start_translation_server(models, args.ip, args.port)
