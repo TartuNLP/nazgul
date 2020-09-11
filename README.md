@@ -9,6 +9,11 @@ Multilingual multi-domain Neural machine translation server based on Amazon Sock
 pip3 install mxnet sentencepiece sockeye mosestokenizer estnltk
 ```
 
+New:
+```
+pip install ConfigArgParse
+```
+
 ## Usage in command-line:
 
 ```
