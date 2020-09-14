@@ -1,28 +1,80 @@
 #!/usr/bin/python3
 
+# Builtin imports
 import sock
-import translator
-
 import sys
 import json
+import yaml
 from time import time
-from nltk import sent_tokenize
 
+# 3rd party imports
+from nltk import sent_tokenize
+import configargparse
+
+# Self defined imports
+from translator import Translator
 from constraints import getPolitenessConstraints as getCnstrs
 from log import log
 
-import configargparse
-import yaml
 
+class NMT_Server:
+    def __init__(self, translator_engine: Translator):
+        self.engine = translator_engine
 
+    def parse_input(self, raw_msg):
+        try:
+            fullText = raw_msg['src']
+            raw_style, raw_out_lang = get_conf(raw_msg['conf'])
 
-# TODO: Add this to a real config file
-### Legacy stuff
-# supportedStyles = { 'fml', 'inf', 'auto' }
-# styleToDomain = { 'fml': 'ep', 'inf': 'os', 'auto': 'pc' }
-# supportedStyles = { "os", "un", "dg", "jr", "ep", "pc", "em", "nc" }
-# extraSupportedOutLangs = { 'est': 'et', 'lav': 'lv', 'eng': 'en', 'rus': 'ru', 'fin': 'fi', 'lit': 'lt', 'ger': 'de' }
-# defaultStyle = 'auto'
+            livesubs = "|" in fullText
+
+            sentences = fullText.split("|") if livesubs else sent_tokenize(fullText)
+            delim = "|" if livesubs else " "
+
+        except KeyError:
+            sentences = raw_msg['sentences']
+            raw_style = raw_msg['outStyle']
+            raw_out_lang = raw_msg['outLang']
+            delim = False
+
+        if raw_out_lang not in supportedOutLangs:
+            # raise ValueError("out lang bad: " + rawOutLang)
+            raw_out_lang = defaultOutLang
+
+        outputLang = raw_out_lang
+        # outputStyle = styleToDomain[rawStyle]
+        outputStyle = None
+
+        return sentences, outputLang, outputStyle, delim
+
+    def decode_request(self, raw_msg):
+        struct = json.loads(raw_msg.decode('utf-8'))
+
+        segments, output_lang, output_style, delim = self.parse_input(struct)
+
+        return segments, output_lang, output_style, delim
+
+    def encode_response(self, translation_list, delim):
+        translation_text = delim.join(translation_list)
+
+        # TODO: Check what to do with raw_trans and raw_input? Some legacy thing?
+        result = json.dumps({'final_trans': translation_text})
+
+        return bytes(result, 'utf-8')
+
+    def translation_wrapper(self, raw_msg):
+        segments, output_lang, output_style, delim = self.decode_request(raw_msg)
+
+        # TODO: Handle multiple out_languages, until then, just multiply one...
+        translations, _, _, _ = self.engine.translate(segments, [output_lang] * len(segments))
+
+        return self.encode_response(translations, delim)
+
+    def start_translation_server(self, ip, port):
+        log("started server")
+
+        # start listening as a socket server; apply serverTranslationFunc to incoming messages to generate the response
+        sock.startServer(self, port=port, host=ip)
 
 
 def get_conf(raw_conf):
@@ -30,103 +82,13 @@ def get_conf(raw_conf):
     outlang = 'en'
 
     for field in raw_conf.split(','):
-        if field in supportedStyles:
-            style = field
         if field in supportedOutLangs:
             outlang = field
-        #if field in extraSupportedOutLangs:
-        #    outlang = extraSupportedOutLangs[field]
 
     return style, outlang
 
 
-def parse_input(raw_msg):
-    global supportedStyles, defaultStyle, supportedOutLangs, defaultOutLang
 
-    try:
-        fullText = raw_msg['src']
-        raw_style, raw_out_lang = get_conf(raw_msg['conf'])
-
-        livesubs = "|" in fullText
-
-        sentences = fullText.split("|") if livesubs else sent_tokenize(fullText)
-        delim = "|" if livesubs else " "
-
-    except KeyError:
-        sentences = raw_msg['sentences']
-        raw_style = raw_msg['outStyle']
-        raw_out_lang = raw_msg['outLang']
-        delim = False
-
-    if raw_style not in supportedStyles:
-        # raise ValueError("style bad: " + rawStyle)
-        raw_style = defaultStyle
-
-    if raw_out_lang not in supportedOutLangs:
-        # raise ValueError("out lang bad: " + rawOutLang)
-        raw_out_lang = defaultOutLang
-
-    outputLang = raw_out_lang
-    # outputStyle = styleToDomain[rawStyle]
-    outputStyle = None
-
-    return sentences, outputLang, outputStyle, delim
-
-
-def decode_request(raw_message):
-    struct = json.loads(raw_message.decode('utf-8'))
-
-    segments, output_lang, output_style, delim = parse_input(struct)
-
-    return segments, output_lang, output_style, delim
-
-
-def encode_response(translation_list, delim):
-    translation_text = delim.join(translation_list)
-
-    # TODO: Check what to do with raw_trans and raw_input? Some legacy thing?
-    result = json.dumps({'raw_trans': ['-'],
-                         'raw_input': ['-'],
-                         'final_trans': translation_text})
-
-    return bytes(result, 'utf-8')
-
-
-def server_translation_func(raw_message, sockeye_models):
-    segments, output_lang, output_style, delim = decode_request(raw_message)
-
-    translations, _, _, _ = translator.translate(sockeye_models, segments, output_lang, output_style, getCnstrs())
-
-    return encode_response(translations, delim)
-
-
-def start_translation_server(sockeye_models, ip, port):
-    log("started server")
-
-    # start listening as a socket server; apply serverTranslationFunc to incoming messages to generate the response
-    sock.startServer(server_translation_func, (sockeye_models,), port=port, host=ip)
-
-#### TODO: Add this functionality separately
-"""
-def translateStdinInBatches(models, outputLang, outputStyle):
-    '''Read lines from STDIN and treat each as a segment to translate;
-	translate them and print out tab-separated scores (decoder log-prob)
-	and the translation outputs'''
-
-    # read STDIN as a list of segments
-    lines = [line.strip() for line in sys.stdin]
-
-    # translate segments and get translations and scores
-    translations, scores, _, _ = translator.translate(models, lines, outputLang, outputStyle, getCnstrs())
-
-    # print each score and translation, separated with a tab
-    for translation, score in zip(translations, scores):
-        print("{0}\t{1}".format(score, translation))
-"""
-
-#############################################################################################
-################################## Cmdline and main block ###################################
-#############################################################################################
 
 
 if __name__ == "__main__":
@@ -136,7 +98,7 @@ if __name__ == "__main__":
         default_config_files=["config/config.ini"]
     )
     parser.add_argument('--config', type=yaml.safe_load)
-    parser.add_argument("--model", "-m", required=True, type=str, help="Path to Sockeye model folder")
+    parser.add_argument("--models", "-m", required=True, type=str, help="Path to Sockeye model folder")
     parser.add_argument("--spm_model", "-s", required=True, type=str,
                         help="Path to trained Google SentencePiece model file")
     parser.add_argument("--tc_model", "-t", type=str, default=None,
@@ -166,6 +128,7 @@ if __name__ == "__main__":
     supportedOutLangs = args.langs
     defaultOutLang = "et"
     # load translation and preprocessing models using paths
-    models = translator.load_models(args.model, args.spm_model, args.tc_model, args.cpu)
+    translation_engine = Translator(args.models, args.spm_model, args.tc_model, args.cpu)
 
-    start_translation_server(models, args.ip, args.port)
+    nmt_server = NMT_Server(translation_engine)
+    nmt_server.start_translation_server(args.ip, args.port)

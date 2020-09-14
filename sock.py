@@ -11,7 +11,8 @@ def _politeness(c, expected, response = False):
 	if response:
 		c.send(response)
 
-def startServer(msgProcFunc, msgProcArgs, host = '172.17.66.215', port = 12349, log = False):
+
+def startServer(nmt_server, host = '172.17.66.215', port = 12349, log = False):
 	s = socket.socket()
 	s.bind((host, port))
 	
@@ -32,9 +33,9 @@ def startServer(msgProcFunc, msgProcArgs, host = '172.17.66.215', port = 12349, 
 					msg = c.recv(inMsgSize + 13)
 				
 				if msg:
-					responseMsg = msgProcFunc(msg, *msgProcArgs)
+					responseMsg = nmt_server.translation_wrapper(msg)
 				else:
-					responseMsg = bytes(json.dumps({ 'final_trans': '' }), 'utf-8')
+					responseMsg = bytes(json.dumps({'final_trans': ''}), 'utf-8')
 				
 				if len(responseMsg) > 1024:
 					print("size warning sent: " + str(len(responseMsg)))
